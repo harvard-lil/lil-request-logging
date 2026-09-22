@@ -1,0 +1,22 @@
+[project]
+name = "lil-request-logging"
+version = "0.1.0"
+description = "Shared JSON access records for Gunicorn and ASGI"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/harvard-lil/lil-request-logging"
+Issues = "https://github.com/harvard-lil/lil-request-logging/issues"
+
+[project.optional-dependencies]
+gunicorn = [
+    "gunicorn>=23,<27",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
