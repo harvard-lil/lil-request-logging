@@ -45,8 +45,38 @@ class AccessTests(unittest.TestCase):
         row = json.loads(out.getvalue())
         self.assertEqual((row['status'], row['response_bytes'], row['duration_ms']),
                          (201, 4, 12.5))
-        self.assertIsNone(row['complete'])
+        self.assertIs(row['complete'], True)
         self.assertNotIn('secret', out.getvalue())
+
+    def test_gunicorn_complete_follows_the_exception_in_flight(self):
+        # Gunicorn calls access() from a finally around writing the body.
+        cfg = Config()
+        cfg.set('accesslog', '-')
+        logger = AccessLogger(cfg)
+
+        def logged(resp, exc):
+            with redirect_stdout(io.StringIO()) as out:
+                try:
+                    try:
+                        if exc:
+                            raise exc
+                    finally:
+                        logger.access(resp, None, {'REQUEST_METHOD': 'GET'},
+                                      timedelta(milliseconds=1))
+                except OSError:
+                    pass
+            return json.loads(out.getvalue())['complete']
+
+        def resp(**extra):
+            return SimpleNamespace(status='200 OK', sent=4, **extra)
+
+        self.assertIs(logged(resp(headers_sent=True), None), True)
+        # The body had started and stopped early.
+        self.assertIs(logged(resp(headers_sent=True), BrokenPipeError()), False)
+        # Nothing had gone out; an error response follows with its own record.
+        self.assertIsNone(logged(resp(headers_sent=False), BrokenPipeError()))
+        # A response object that does not say, like Gunicorn's ASGI worker's.
+        self.assertIsNone(logged(resp(), BrokenPipeError()))
 
     def test_asgi_complete_and_interrupted(self):
         async def app(scope, receive, send):

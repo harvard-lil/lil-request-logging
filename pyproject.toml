@@ -1,6 +1,6 @@
 [project]
 name = "lil-request-logging"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared JSON access records for Gunicorn and ASGI"
 readme = "README.md"
 license = "MIT"
