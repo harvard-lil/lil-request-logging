@@ -99,7 +99,7 @@ Missing values are represented by JSON `null`.
 | `status` | Observed HTTP status, or null if no response status was observed |
 | `response_bytes` | Response body bytes reported by Gunicorn or accepted by ASGI `send`; excludes headers |
 | `duration_ms` | Request duration in milliseconds |
-| `complete` | For ASGI, whether `send` accepted the final body message; null for Gunicorn |
+| `complete` | Whether the server finished sending the response body: for ASGI, whether `send` accepted the final body message; for Gunicorn, whether the body was written without an exception. Null when that cannot be known |
 | `peer_ip`, `client_ip` | Transport peer and, when trusted, Cloudflare's visitor address |
 | `forwarded_for_untrusted` | Raw `X-Forwarded-For` value for diagnosis |
 | `host`, `referrer`, `user_agent`, `cf_ray` | Selected request headers; referrer is sanitized |
@@ -110,9 +110,19 @@ should identify the built artifact and remain unchanged when promoting it betwee
 environments. The package does not initialize or configure Sentry.
 
 Request duration and byte counts describe what the server observed; they do not
-prove the client received the response. An interrupted ASGI request keeps its
-observed status and has `complete: false`. A disconnect does not automatically
-become a 500. Exceptions continue to the server's existing error handling.
+prove the client received the response. An interrupted request keeps its observed
+status and has `complete: false`. A disconnect does not automatically become a
+500. Exceptions continue to the server's existing error handling.
+
+Under Gunicorn, `complete` is `false` when the response had started and writing
+stopped early: the client or a proxy in front went away, or the application
+raised partway through its body. It is null when an exception came before
+anything was sent, since Gunicorn then writes an error response with its own
+record, and for the record of that error response, which Gunicorn logs before
+sending it. It does not compare `response_bytes` with `Content-Length`: Gunicorn
+counts a chunk before writing it, and does not count bytes sent with `sendfile`,
+so `response_bytes` can be 0 for a complete response served through
+`wsgi.file_wrapper`.
 
 ## Privacy
 
